@@ -1,0 +1,37 @@
+.clothing-menu {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  padding: 10px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  max-height: 200px;
+  overflow-y: auto;
+  width: 250px;
+  border-radius: 8px;
+  text-align: left;
+  z-index: 10;
+}
+
+.clothing-carousel {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.clothing-item {
+  padding: 8px;
+  background-color: #333;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  color: white;
+}
+
+.clothing-item.selected {
+  background-color: #555;
+}
+
+.clothing-item:hover {
+  background-color: #444;
+}

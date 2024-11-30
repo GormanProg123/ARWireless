@@ -1,0 +1,66 @@
+.container {
+  display: flex;
+}
+
+.menuButton {
+  padding: 10px 20px;
+  font-size: 16px;
+}
+
+.menu {
+  position: fixed; /* Изменено на fixed для появления на экране */
+  top: 0;
+  left: -250px; /* Начальное положение за экраном */
+  width: 250px;
+  height: 100%;
+  background-color: #333;
+  color: white;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
+  transition: left 0.3s ease; /* Плавный переход для свойства left */
+}
+
+.menuOpen {
+  left: 0; /* Позиция меню на экране */
+}
+
+.menuList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.menuItem {
+  padding: 15px;
+  cursor: pointer;
+  border-bottom: 1px solid #444;
+}
+
+.menuItem:hover {
+  background-color: #555;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 10px;
+  align-self: flex-end; /* Чтобы кнопка была вверху */
+}
+
+.navigateButton {
+  padding: 10px 20px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  margin: 10px;
+}
+
+.navigateButton:hover {
+  background-color: #45a049;
+}
+

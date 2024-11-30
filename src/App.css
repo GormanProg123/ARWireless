@@ -36,3 +36,14 @@
     transform: rotate(360deg);
   }
 }
+
+@media only screen and (max-width: 768px) {
+  .keypoints-info, .model-info {
+    display: none;  /* Скрываем на мобильных устройствах */
+  }
+
+  /* Меню остается видимым */
+  .clothing-menu {
+    display: block;
+  }
+}

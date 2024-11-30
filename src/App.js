@@ -185,135 +185,137 @@ function App() {
 
   return (
     <div className="App">
-      <header className="App-header">
-        <div style={{ display: "flex", alignItems: "center" }}>
-          {/* Clothing Menu for selecting model */}
-          <ClothingMenu onModelSelect={setSelectedModel} />
+  <header className="App-header">
+    <div style={{ display: "flex", alignItems: "center" }}>
+      {/* Clothing Menu for selecting model */}
+      <ClothingMenu className="clothing-menu" onModelSelect={setSelectedModel} />
 
-          {/* Left Side Menu (Model Info) */}
-          <div
-            style={{
-              position: "absolute",
-              top: "10px",
-              left: "10px",
-              padding: "10px",
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              color: "white",
-              maxHeight: "480px",
-              width: "250px",
-              borderRadius: "8px",
-            }}
-          >
-            <h3>Model Info:</h3>
-            {selectedModel ? (
-              <>
-                <p>
-                  <strong>Model: </strong>
-                  {selectedModel}
-                </p>
-                <p>
-                  <strong>Position:</strong> X: {modelPosition.x.toFixed(2)} Y:{" "}
-                  {modelPosition.y.toFixed(2)} Z: {modelPosition.z.toFixed(2)}
-                </p>
-                <p>
-                  <strong>Scale:</strong> {scale.toFixed(2)}
-                </p>
-              </>
-            ) : (
-              <p>Select a model from the menu.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Right Side Menu (Keypoint Info) */}
-        <div
-          style={{
-            position: "absolute",
-            top: "10px",
-            right: "20px", // Increased distance from the edge
-            padding: "10px",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            color: "white",
-            maxHeight: "480px",
-            width: "300px", // Adjusted width to match the content
-            borderRadius: "8px",
-            overflowY: "auto",
-          }}
-        >
-          <h3>Keypoints Info:</h3>
-          {visibleKeypoints.length > 0 ? (
-            visibleKeypoints.map((keypoint) => (
-              <div key={keypoint.part}>
-                <p>
-                  <strong>{keypoint.part}:</strong> X: {keypoint.position.x.toFixed(2)} Y:{" "}
-                  {keypoint.position.y.toFixed(2)}
-                </p>
-              </div>
-            ))
-          ) : (
-            <p>No visible keypoints detected.</p>
-          )}
-        </div>
-
-        {/* Canvas to draw pose and keypoints */}
-        <canvas
-          ref={canvasRef}
-          style={{
-            position: "absolute",
-            marginLeft: "auto",
-            marginRight: "auto",
-            left: 0,
-            right: 0,
-            textAlign: "center",
-            zIndex: 2,
-            width: 1280, // Enlarged size
-            height: 720,
-          }}
-        />
-
-        {/* Webcam stream */}
-        <Webcam
-          ref={webcamRef}
-          videoConstraints={{
-            width: 1280, // Enlarged size
-            height: 720,
-            facingMode: "user",
-          }}
-          style={{
-            position: "absolute",
-            marginLeft: "auto",
-            marginRight: "auto",
-            left: 0,
-            right: 0,
-            textAlign: "center",
-            zIndex: 1,
-            width: 1280,
-            height: 720,
-          }}
-        />
-
-        {/* Clothing model on Canvas */}
-        {selectedModel && (
-          <Canvas
-            style={{
-              position: "absolute",
-              zIndex: 5,
-              width: 1280,
-              height: 720,
-              left: "50%",
-              transform: "translateX(-50%)",
-            }}
-          >
-            <ambientLight intensity={0.5} />
-            <ClothingOverlay
-              modelPath={selectedModel}
-              position={modelPosition}
-              scale={scale}
-            />
-          </Canvas>
+      {/* Скрытая информация для мобильных устройств */}
+      <div
+        className="model-info"
+        style={{
+          position: "absolute",
+          top: "10px",
+          left: "10px",
+          padding: "10px",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          color: "white",
+          maxHeight: "480px",
+          width: "250px",
+          borderRadius: "8px",
+        }}
+      >
+        <h3>Model Info:</h3>
+        {selectedModel ? (
+          <>
+            <p>
+              <strong>Model: </strong>
+              {selectedModel}
+            </p>
+            <p>
+              <strong>Position:</strong> X: {modelPosition.x.toFixed(2)} Y:{" "}
+              {modelPosition.y.toFixed(2)} Z: {modelPosition.z.toFixed(2)}
+            </p>
+            <p>
+              <strong>Scale:</strong> {scale.toFixed(2)}
+            </p>
+          </>
+        ) : (
+          <p>Select a model from the menu.</p>
         )}
-      </header>
+      </div>
+
+      {/* Скрытая информация для мобильных устройств */}
+      <div
+        className="keypoints-info"
+        style={{
+          position: "absolute",
+          top: "10px",
+          right: "20px", // Increased distance from the edge
+          padding: "10px",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          color: "white",
+          maxHeight: "480px",
+          width: "300px", // Adjusted width to match the content
+          borderRadius: "8px",
+          overflowY: "auto",
+        }}
+      >
+        <h3>Keypoints Info:</h3>
+        {visibleKeypoints.length > 0 ? (
+          visibleKeypoints.map((keypoint) => (
+            <div key={keypoint.part}>
+              <p>
+                <strong>{keypoint.part}:</strong> X: {keypoint.position.x.toFixed(2)} Y:{" "}
+                {keypoint.position.y.toFixed(2)}
+              </p>
+            </div>
+          ))
+        ) : (
+          <p>No visible keypoints detected.</p>
+        )}
+      </div>
     </div>
+
+    {/* Canvas to draw pose and keypoints */}
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: "absolute",
+        marginLeft: "auto",
+        marginRight: "auto",
+        left: 0,
+        right: 0,
+        textAlign: "center",
+        zIndex: 2,
+        width: 1280, // Enlarged size
+        height: 720,
+      }}
+    />
+
+    {/* Webcam stream */}
+    <Webcam
+      ref={webcamRef}
+      videoConstraints={{
+        width: 1280, // Enlarged size
+        height: 720,
+        facingMode: "environment", // Используем основную камеру
+      }}
+      style={{
+        position: "absolute",
+        marginLeft: "auto",
+        marginRight: "auto",
+        left: 0,
+        right: 0,
+        textAlign: "center",
+        zIndex: 1,
+        width: 1280,
+        height: 720,
+      }}
+    />
+
+    {/* Clothing model on Canvas */}
+    {selectedModel && (
+      <Canvas
+        style={{
+          position: "absolute",
+          zIndex: 5,
+          width: 1280,
+          height: 720,
+          left: "50%",
+          transform: "translateX(-50%)",
+        }}
+      >
+        <ambientLight intensity={0.5} />
+        <ClothingOverlay
+          modelPath={selectedModel}
+          position={modelPosition}
+          scale={scale}
+        />
+      </Canvas>
+    )}
+  </header>
+  </div>
   );
 }
 

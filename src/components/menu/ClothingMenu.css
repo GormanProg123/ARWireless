@@ -35,3 +35,29 @@
 .clothing-item:hover {
   background-color: #444;
 }
+
+@media only screen and (max-width: 768px) {
+  .clothing-menu {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%; /* Меню занимает всю ширину */
+    max-height: 150px; /* Уменьшенная высота */
+    padding: 5px;
+    border-radius: 0; /* Убираем закругления */
+  }
+
+  .clothing-carousel {
+    flex-direction: row; /* Делаем карусель горизонтальной */
+    gap: 10px;
+    overflow-x: auto; /* Прокрутка по горизонтали */
+    padding-bottom: 5px;
+  }
+
+  .clothing-item {
+    flex: 0 0 auto; /* Элементы не растягиваются */
+    width: 80px; /* Фиксированная ширина элемента */
+    text-align: center;
+    font-size: 12px; /* Уменьшенный размер текста */
+  }
+}

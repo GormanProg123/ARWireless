@@ -1,8 +1,0 @@
-.canvasContainer {
-  width: 70vw;
-  height: 100vh;
-  margin-left: 20vw; /* Смещение вправо */
-  margin-top: -10vw;
-  position: absolute;
-  top: 10vh; /* Смещение вниз */
-}

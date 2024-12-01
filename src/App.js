@@ -45,6 +45,9 @@ function App() {
   const [scale, setScale] = useState(1);
   const [lastPoseTime, setLastPoseTime] = useState(0);
 
+  // Определение устройства (мобильное или ПК)
+  const isMobile = window.innerWidth <= 768;
+
   useEffect(() => {
     const loadPosenet = async () => {
       netRef.current = await posenet.load({
@@ -57,13 +60,11 @@ function App() {
     loadPosenet();
   }, []);
 
-  // Линейная интерполяция для ключевых точек
   const lerpKeypoint = (current, target, alpha = 0.5) => ({
     x: lerp(current.x, target.x, alpha),
     y: lerp(current.y, target.y, alpha),
   });
 
-  // Обновление ключевых точек
   const updateVisibleKeypoints = (keypoints) => {
     const MIN_SCORE_THRESHOLD = 0.7;
     const filteredKeypoints = keypoints.filter((point) => point.score > MIN_SCORE_THRESHOLD);
@@ -142,7 +143,7 @@ function App() {
           const shoulderWidth = Math.abs(points[0].x - points[1].x);
           const torsoHeight = Math.abs(points[2].y - points[0].y);
 
-          const scaleFactor = Math.max(shoulderWidth * 2.5, torsoHeight * 2.5);
+          const scaleFactor = isMobile ? Math.max(shoulderWidth * 1.5, torsoHeight * 1.5) : Math.max(shoulderWidth * 2.5, torsoHeight * 2.5);
           const targetPosition = { x: centerX, y: centerY - torsoHeight / 2, z: 0 };
           const smoothedPosition = smoothTransition(modelPosition, targetPosition, 0.15);
 
@@ -259,62 +260,61 @@ function App() {
 
     {/* Canvas to draw pose and keypoints */}
     <canvas
-      ref={canvasRef}
-      style={{
-        position: "absolute",
-        marginLeft: "auto",
-        marginRight: "auto",
-        left: 0,
-        right: 0,
-        textAlign: "center",
-        zIndex: 2,
-        width: 1280, // Enlarged size
-        height: 720,
-      }}
-    />
-
+          ref={canvasRef}
+          style={{
+            position: "absolute",
+            marginLeft: "auto",
+            marginRight: "auto",
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            zIndex: 2,
+            width: isMobile ? "100%" : "1280px",
+            height: isMobile ? "100%" : "720px",
+          }}
+        />
     {/* Webcam stream */}
     <Webcam
-      ref={webcamRef}
-      videoConstraints={{
-        width: 1280, // Enlarged size
-        height: 720,
-        facingMode: "environment", // Используем основную камеру
-      }}
-      style={{
-        position: "absolute",
-        marginLeft: "auto",
-        marginRight: "auto",
-        left: 0,
-        right: 0,
-        textAlign: "center",
-        zIndex: 1,
-        width: 1280,
-        height: 720,
-      }}
-    />
-
-    {/* Clothing model on Canvas */}
-    {selectedModel && (
-      <Canvas
-        style={{
-          position: "absolute",
-          zIndex: 5,
-          width: 1280,
-          height: 720,
-          left: "50%",
-          transform: "translateX(-50%)",
-        }}
-      >
-        <ambientLight intensity={0.5} />
-        <ClothingOverlay
-          modelPath={selectedModel}
-          position={modelPosition}
-          scale={scale}
+          ref={webcamRef}
+          videoConstraints={{
+            facingMode: "environment",
+            width: isMobile ? window.innerWidth : 1280,
+            height: isMobile ? window.innerHeight : 720,
+          }}
+          style={{
+            position: "absolute",
+            marginLeft: "auto",
+            marginRight: "auto",
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            zIndex: 1,
+            width: isMobile ? "100%" : "1280px",
+            height: isMobile ? "100%" : "720px",
+          }}
         />
-      </Canvas>
-    )}
-  </header>
+
+    {/* Модель одежды */}
+    {selectedModel && (
+          <Canvas
+            style={{
+              position: "absolute",
+              zIndex: 5,
+              width: isMobile ? "100%" : "1280px",
+              height: isMobile ? "100%" : "720px",
+              left: "50%",
+              transform: "translateX(-50%)",
+            }}
+          >
+            <ambientLight intensity={0.5} />
+            <ClothingOverlay
+              modelPath={selectedModel}
+              position={modelPosition}
+              scale={isMobile ? scale * 0.8 : scale}
+            />
+          </Canvas>
+        )}
+      </header>
   </div>
   );
 }

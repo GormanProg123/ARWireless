@@ -44,6 +44,7 @@ function App() {
   const [modelPosition, setModelPosition] = useState({ x: 0, y: 0, z: 0 });
   const [scale, setScale] = useState(1);
   const [lastPoseTime, setLastPoseTime] = useState(0);
+  const [isCameraInitialized, setIsCameraInitialized] = useState(false);
 
   // Определение устройства (мобильное или ПК)
   const isMobile = window.innerWidth <= 768;
@@ -58,6 +59,40 @@ function App() {
     };
 
     loadPosenet();
+  }, []);
+
+  const stopCamera = () => {
+    if (webcamRef.current && webcamRef.current.video.srcObject) {
+      const stream = webcamRef.current.video.srcObject;
+      const tracks = stream.getTracks();
+      tracks.forEach((track) => track.stop());
+      webcamRef.current.video.srcObject = null;
+    }
+  };
+
+  const startCamera = async () => {
+    if (!isCameraInitialized) {
+      setIsCameraInitialized(true);
+
+      const videoConstraints = {
+        facingMode: "environment",
+        width: isMobile ? window.innerWidth : 1280,
+        height: isMobile ? window.innerHeight : 720,
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraints,
+      });
+
+      webcamRef.current.video.srcObject = stream;
+    }
+  };
+
+  useEffect(() => {
+    startCamera();
+    return () => {
+      stopCamera();
+    };
   }, []);
 
   const lerpKeypoint = (current, target, alpha = 0.5) => ({
@@ -81,16 +116,6 @@ function App() {
         return newPoint;
       })
     );
-  };
-
-  const convertPosenetToThreeJS = (x, y, videoWidth, videoHeight) => {
-    const canvasWidth = canvasRef.current.width;
-    const canvasHeight = canvasRef.current.height;
-
-    const normalizedX = ((x / videoWidth) * canvasWidth) / canvasWidth * 2 - 1;
-    const normalizedY = -(((y / videoHeight) * canvasHeight) / canvasHeight * 2 - 1);
-
-    return { x: normalizedX, y: normalizedY };
   };
 
   const detectPose = () => {
@@ -124,27 +149,19 @@ function App() {
         const rightHip = pose.keypoints.find((point) => point.part === "rightHip");
 
         if (leftShoulder && rightShoulder && leftHip && rightHip) {
-          const points = [leftShoulder, rightShoulder, leftHip, rightHip].map(
-            (point) =>
-              convertPosenetToThreeJS(
-                point.position.x,
-                point.position.y,
-                videoWidth,
-                videoHeight
-              )
-          );
+          const shoulderWidth = Math.abs(leftShoulder.position.x - rightShoulder.position.x);
+          const torsoHeight = Math.abs(leftHip.position.y - leftShoulder.position.y);
 
-          const xValues = points.map((p) => p.x);
-          const yValues = points.map((p) => p.y);
+          const scaleFactor = isMobile
+            ? Math.max(shoulderWidth * 1.5, torsoHeight * 1.5)
+            : Math.max(shoulderWidth * 2.5, torsoHeight * 2.5);
 
-          const centerX = (Math.max(...xValues) + Math.min(...xValues)) / 2;
-          const centerY = (Math.max(...yValues) + Math.min(...yValues)) / 2;
+          const targetPosition = {
+            x: (leftShoulder.position.x + rightShoulder.position.x) / 2,
+            y: (leftShoulder.position.y + leftHip.position.y) / 2,
+            z: 0,
+          };
 
-          const shoulderWidth = Math.abs(points[0].x - points[1].x);
-          const torsoHeight = Math.abs(points[2].y - points[0].y);
-
-          const scaleFactor = isMobile ? Math.max(shoulderWidth * 1.5, torsoHeight * 1.5) : Math.max(shoulderWidth * 2.5, torsoHeight * 2.5);
-          const targetPosition = { x: centerX, y: centerY - torsoHeight / 2, z: 0 };
           const smoothedPosition = smoothTransition(modelPosition, targetPosition, 0.15);
 
           setModelPosition(smoothedPosition);
@@ -157,7 +174,7 @@ function App() {
     };
     requestAnimationFrame(updatePose);
   };
-
+  
   const drawSkeleton = (keypoints, minConfidence, ctx) => {
     const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
 
@@ -176,90 +193,91 @@ function App() {
     const canvasWidth = canvas.current.width;
     const canvasHeight = canvas.current.height;
 
+    canvas.current.width = isMobile ? videoWidth : 1280;
+    canvas.current.height = isMobile ? videoHeight : 720;
+
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    canvas.current.width = videoWidth;
-    canvas.current.height = videoHeight;
-
+    drawKeypoints(pose.keypoints, 0.5, ctx);
     drawSkeleton(pose.keypoints, 0.5, ctx);
   };
 
   return (
     <div className="App">
-  <header className="App-header">
-    <div style={{ display: "flex", alignItems: "center" }}>
-      {/* Clothing Menu for selecting model */}
-      <ClothingMenu className="clothing-menu" onModelSelect={setSelectedModel} />
-
-      {/* Скрытая информация для мобильных устройств */}
-      <div
-        className="model-info"
-        style={{
-          position: "absolute",
-          top: "10px",
-          left: "10px",
-          padding: "10px",
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          color: "white",
-          maxHeight: "480px",
-          width: "250px",
-          borderRadius: "8px",
-        }}
-      >
-        <h3>Model Info:</h3>
-        {selectedModel ? (
-          <>
-            <p>
-              <strong>Model: </strong>
-              {selectedModel}
-            </p>
-            <p>
-              <strong>Position:</strong> X: {modelPosition.x.toFixed(2)} Y:{" "}
-              {modelPosition.y.toFixed(2)} Z: {modelPosition.z.toFixed(2)}
-            </p>
-            <p>
-              <strong>Scale:</strong> {scale.toFixed(2)}
-            </p>
-          </>
-        ) : (
-          <p>Select a model from the menu.</p>
-        )}
-      </div>
-
-      {/* Скрытая информация для мобильных устройств */}
-      <div
-        className="keypoints-info"
-        style={{
-          position: "absolute",
-          top: "10px",
-          right: "20px", // Increased distance from the edge
-          padding: "10px",
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          color: "white",
-          maxHeight: "480px",
-          width: "300px", // Adjusted width to match the content
-          borderRadius: "8px",
-          overflowY: "auto",
-        }}
-      >
-        <h3>Keypoints Info:</h3>
-        {visibleKeypoints.length > 0 ? (
-          visibleKeypoints.map((keypoint) => (
-            <div key={keypoint.part}>
-              <p>
-                <strong>{keypoint.part}:</strong> X: {keypoint.position.x.toFixed(2)} Y:{" "}
-                {keypoint.position.y.toFixed(2)}
-              </p>
-            </div>
-          ))
-        ) : (
-          <p>No visible keypoints detected.</p>
-        )}
-      </div>
-    </div>
-
-    {/* Canvas to draw pose and keypoints */}
-    <canvas
+      <header className="App-header">
+        <div style={{ display: "flex", alignItems: "center" }}>
+          {/* Clothing Menu for selecting model */}
+          <ClothingMenu className="clothing-menu" onModelSelect={setSelectedModel} />
+  
+          {/* Скрытая информация для мобильных устройств */}
+          <div
+            className="model-info"
+            style={{
+              position: "absolute",
+              top: "10px",
+              left: "10px",
+              padding: "10px",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              color: "white",
+              maxHeight: "480px",
+              width: "250px",
+              borderRadius: "8px",
+            }}
+          >
+            <h3>Model Info:</h3>
+            {selectedModel ? (
+              <>
+                <p>
+                  <strong>Model: </strong>
+                  {selectedModel}
+                </p>
+                <p>
+                  <strong>Position:</strong> X: {modelPosition.x.toFixed(2)} Y:{" "}
+                  {modelPosition.y.toFixed(2)} Z: {modelPosition.z.toFixed(2)}
+                </p>
+                <p>
+                  <strong>Scale:</strong> {scale.toFixed(2)}
+                </p>
+              </>
+            ) : (
+              <p>Select a model from the menu.</p>
+            )}
+          </div>
+  
+          {/* Информация о ключевых точках */}
+          <div
+            className="keypoints-info"
+            style={{
+              position: "absolute",
+              top: "10px",
+              right: "20px",
+              padding: "10px",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              color: "white",
+              maxHeight: "480px",
+              width: "300px",
+              borderRadius: "8px",
+              overflowY: "auto",
+            }}
+          >
+            <h3>Keypoints Info:</h3>
+            {visibleKeypoints.length > 0 ? (
+              visibleKeypoints.map((keypoint) => (
+                <div key={keypoint.part}>
+                  <p>
+                    <strong>{keypoint.part}:</strong> X: {keypoint.position.x.toFixed(2)} Y:{" "}
+                    {keypoint.position.y.toFixed(2)}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p>No visible keypoints detected.</p>
+            )}
+          </div>
+        </div>
+  
+        {/* Canvas для отображения позы и ключевых точек */}
+        <canvas
           ref={canvasRef}
           style={{
             position: "absolute",
@@ -273,8 +291,9 @@ function App() {
             height: isMobile ? "100%" : "720px",
           }}
         />
-    {/* Webcam stream */}
-    <Webcam
+  
+        {/* Поток с веб-камеры */}
+        <Webcam
           ref={webcamRef}
           videoConstraints={{
             facingMode: "environment",
@@ -293,9 +312,9 @@ function App() {
             height: isMobile ? "100%" : "720px",
           }}
         />
-
-    {/* Модель одежды */}
-    {selectedModel && (
+  
+        {/* Модель одежды */}
+        {selectedModel && (
           <Canvas
             style={{
               position: "absolute",
@@ -315,8 +334,9 @@ function App() {
           </Canvas>
         )}
       </header>
-  </div>
+    </div>
   );
+  
 }
 
 export default App;

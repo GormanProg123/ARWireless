@@ -37,6 +37,11 @@ function ClothingOverlay({ modelPath, position, scale }) {
   ) : null;
 }
 
+const lerpKeypoint = (current, target, alpha = 0.5) => ({
+  x: lerp(current.x, target.x, alpha),
+  y: lerp(current.y, target.y, alpha),
+});
+
 function App() {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
@@ -50,6 +55,10 @@ function App() {
 
   // Определение устройства (мобильное или ПК)
   const isMobile = window.innerWidth <= 768;
+
+  // Увеличиваем размеры камеры для телефона
+  const videoWidth = isMobile ? (isPortrait ? 480 : 720) : 1280;
+  const videoHeight = isMobile ? (isPortrait ? 800 : 540) : 720;
 
   useEffect(() => {
     const loadPosenet = async () => {
@@ -77,16 +86,16 @@ function App() {
       try {
         const videoConstraints = {
           facingMode: "environment",
-          width: isMobile ? window.innerWidth : 1280,
-          height: isMobile ? window.innerHeight : 720,
+          width: videoWidth,
+          height: videoHeight,
         };
-  
+
         const stream = await navigator.mediaDevices.getUserMedia({
           video: videoConstraints,
         });
-  
+
         webcamRef.current.video.srcObject = stream;
-        setIsCameraInitialized(true); // Устанавливаем флаг после успешного запуска камеры
+        setIsCameraInitialized(true);
       } catch (error) {
         console.error("Ошибка доступа к камере: ", error);
       }
@@ -94,17 +103,11 @@ function App() {
   };
 
   useEffect(() => {
-    startCamera(); // Запускаем камеру один раз
-  
+    startCamera();
     return () => {
-      stopCamera(); // Очищаем ресурсы при размонтировании
+      stopCamera();
     };
   }, []);
-
-  const lerpKeypoint = (current, target, alpha = 0.5) => ({
-    x: lerp(current.x, target.x, alpha),
-    y: lerp(current.y, target.y, alpha),
-  });
 
   const updateVisibleKeypoints = (keypoints) => {
     const MIN_SCORE_THRESHOLD = 0.7;
@@ -124,125 +127,110 @@ function App() {
     );
   };
 
-  const convertPosenetToThreeJS = (x, y, videoWidth, videoHeight) => {
-    const canvasWidth = canvasRef.current.width;
-    const canvasHeight = canvasRef.current.height;
-  
-    // Преобразование координат с учетом пропорций
-    const scaleX = canvasWidth / videoWidth;
-    const scaleY = canvasHeight / videoHeight;
-  
-    return {
-      x: x * scaleX,
-      y: y * scaleY,
-    };
-  };
-  
-  
+  // Конвертация позы в координаты для Three.js
+const convertPosenetToThreeJS = (x, y, videoWidth, videoHeight, canvasWidth, canvasHeight) => {
+  const normalizedX = ((x / videoWidth) * canvasWidth) / canvasWidth * 2 - 1;
+  const normalizedY = -(((y / videoHeight) * canvasHeight) / canvasHeight * 2 - 1);
+  return { x: normalizedX, y: normalizedY };
+};
 
-  const detectPose = () => {
-    const updatePose = async () => {
-      const now = Date.now();
-      if (now - lastPoseTime < 100) {
-        requestAnimationFrame(updatePose);
-        return;
-      }
-  
-      if (
-        webcamRef.current &&
-        webcamRef.current.video.readyState === 4 &&
-        netRef.current
-      ) {
-        const video = webcamRef.current.video;
-  
-        // Ориентация экрана
-        const isPortrait = window.innerHeight > window.innerWidth;
-  
-        const videoWidth = isPortrait ? 480 : 640; // Подстройка под ориентацию
-        const videoHeight = isPortrait ? 640 : 480;
-  
-        webcamRef.current.video.width = videoWidth;
-        webcamRef.current.video.height = videoHeight;
-  
-        const pose = await netRef.current.estimateSinglePose(video);
-  
-        drawCanvas(pose, video, videoWidth, videoHeight, canvasRef);
-        updateVisibleKeypoints(pose.keypoints);
-  
-        const leftShoulder = pose.keypoints.find((point) => point.part === "leftShoulder");
-        const rightShoulder = pose.keypoints.find((point) => point.part === "rightShoulder");
-        const leftHip = pose.keypoints.find((point) => point.part === "leftHip");
-        const rightHip = pose.keypoints.find((point) => point.part === "rightHip");
-  
-        if (leftShoulder && rightShoulder && leftHip && rightHip) {
-          const points = [leftShoulder, rightShoulder, leftHip, rightHip].map((point) =>
+
+const detectPose = () => {
+  const updatePose = async () => {
+    const now = Date.now();
+    if (now - lastPoseTime < 100) {
+      requestAnimationFrame(updatePose);
+      return;
+    }
+
+    if (
+      webcamRef.current &&
+      webcamRef.current.video.readyState === 4 &&
+      netRef.current
+    ) {
+      const video = webcamRef.current.video;
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
+      const canvasWidth = canvasRef.current.width;
+      const canvasHeight = canvasRef.current.height;
+
+      webcamRef.current.video.width = videoWidth;
+      webcamRef.current.video.height = videoHeight;
+
+      const pose = await netRef.current.estimateSinglePose(video);
+
+      drawCanvas(pose, video, videoWidth, videoHeight, canvasRef);
+      updateVisibleKeypoints(pose.keypoints);
+
+      const leftShoulder = pose.keypoints.find((point) => point.part === "leftShoulder");
+      const rightShoulder = pose.keypoints.find((point) => point.part === "rightShoulder");
+      const leftHip = pose.keypoints.find((point) => point.part === "leftHip");
+      const rightHip = pose.keypoints.find((point) => point.part === "rightHip");
+
+      if (leftShoulder && rightShoulder && leftHip && rightHip) {
+        const points = [leftShoulder, rightShoulder, leftHip, rightHip].map(
+          (point) =>
             convertPosenetToThreeJS(
               point.position.x,
               point.position.y,
               videoWidth,
-              videoHeight
+              videoHeight,
+              canvasWidth,
+              canvasHeight
             )
-          );
-  
-          const xValues = points.map((p) => p.x);
-          const yValues = points.map((p) => p.y);
-  
-          const centerX = (Math.max(...xValues) + Math.min(...xValues)) / 2;
-          const centerY = (Math.max(...yValues) + Math.min(...yValues)) / 2;
-  
-          const shoulderWidth = Math.abs(points[0].x - points[1].x);
-          const torsoHeight = Math.abs(points[2].y - points[0].y);
-  
-          const scaleFactor = isMobile
-            ? Math.max(shoulderWidth, torsoHeight) * 1.2
-            : Math.max(shoulderWidth * 2, torsoHeight * 2);
-  
-          const targetPosition = { x: centerX, y: centerY - torsoHeight / 2, z: 0 };
-          const smoothedPosition = smoothTransition(modelPosition, targetPosition, 0.15);
-  
-          setModelPosition(smoothedPosition);
-          setScale(scaleFactor);
-        }
-  
-        setLastPoseTime(now);
+        );
+
+        const xValues = points.map((p) => p.x);
+        const yValues = points.map((p) => p.y);
+
+        const centerX = (Math.max(...xValues) + Math.min(...xValues)) / 2;
+        const centerY = (Math.max(...yValues) + Math.min(...yValues)) / 2;
+
+        const shoulderWidth = Math.abs(points[0].x - points[1].x);
+        const torsoHeight = Math.abs(points[2].y - points[0].y);
+
+        const scaleFactor = Math.max(shoulderWidth * 2.5, torsoHeight * 2.5);
+        const targetPosition = { x: centerX, y: centerY - torsoHeight / 2, z: 0 };
+        const smoothedPosition = smoothTransition(modelPosition, targetPosition, 0.15);
+
+        setModelPosition(smoothedPosition);
+        setScale(scaleFactor);
       }
-      requestAnimationFrame(updatePose);
-    };
+
+      setLastPoseTime(now);
+    }
     requestAnimationFrame(updatePose);
   };
-  
-  
-  const drawSkeleton = (keypoints, minConfidence, ctx) => {
-    const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
-  
-    adjacentKeyPoints.forEach(([from, to]) => {
-      const startX = (from.position.x / webcamRef.current.video.videoWidth) * canvasRef.current.width;
-      const startY = (from.position.y / webcamRef.current.video.videoHeight) * canvasRef.current.height;
-      const endX = (to.position.x / webcamRef.current.video.videoWidth) * canvasRef.current.width;
-      const endY = (to.position.y / webcamRef.current.video.videoHeight) * canvasRef.current.height;
-  
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      ctx.lineTo(endX, endY);
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = "rgb(0, 255, 0)";
-      ctx.stroke();
-    });
-  };
+  requestAnimationFrame(updatePose);
+};
+
 
   const drawCanvas = (pose, video, videoWidth, videoHeight, canvas) => {
     const ctx = canvas.current.getContext("2d");
     const canvasWidth = canvas.current.width;
     const canvasHeight = canvas.current.height;
-  
+
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-  
+
     canvas.current.width = videoWidth;
     canvas.current.height = videoHeight;
-  
+
     drawSkeleton(pose.keypoints, 0.5, ctx);
   };
+
   
+  const drawSkeleton = (keypoints, minConfidence, ctx) => {
+    const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
+
+    adjacentKeyPoints.forEach(([from, to]) => {
+      ctx.beginPath();
+      ctx.moveTo(from.position.x, from.position.y);
+      ctx.lineTo(to.position.x, to.position.y);
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = 'rgb(0, 255, 0)';
+      ctx.stroke();
+    });
+  };
 
   return (
     <div className="App">
@@ -320,27 +308,27 @@ function App() {
   
         {/* Canvas для отображения позы и ключевых точек */}
         <canvas
-  ref={canvasRef}
-  style={{
-    position: "absolute",
-    marginLeft: "auto",
-    marginRight: "auto",
-    left: 0,
-    right: 0,
-    textAlign: "center",
-    zIndex: 2,
-    width: isMobile ? "100%" : "1280px", // Масштабируем под экран
-    height: isMobile ? "auto" : "720px", // Высота будет адаптироваться
-  }}
-/>
+          ref={canvasRef}
+          style={{
+            position: "absolute",
+            marginLeft: "auto",
+            marginRight: "auto",
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            zIndex: 2,
+            width: isMobile ? "100%" : "1280px",
+            height: isMobile ? "100%" : "720px",
+          }}
+        />
   
         {/* Поток с веб-камеры */}
         <Webcam
   ref={webcamRef}
   videoConstraints={{
     facingMode: "environment",
-    width: isMobile ? 720 : 1280, // Увеличиваем ширину на мобильных
-    height: isMobile ? 1280 : 720, // Увеличиваем высоту на мобильных
+    width: isMobile ? 864 : 1280,  // Увеличиваем ширину на мобильных устройствах (1.2x от 720)
+    height: isMobile ? 1536 : 720, // Увеличиваем высоту на мобильных устройствах (1.2x от 1280)
   }}
   style={{
     position: "absolute",
@@ -350,8 +338,8 @@ function App() {
     right: 0,
     textAlign: "center",
     zIndex: 1,
-    width: isMobile ? "100%" : "1280px", // Масштабируем под экран
-    height: isMobile ? "auto" : "720px", // Высота будет адаптироваться
+    width: isMobile ? "120%" : "1280px",  // Увеличиваем ширину на мобильных устройствах
+    height: isMobile ? "auto" : "720px",  // Высота будет адаптироваться
   }}
 />
 

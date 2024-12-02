@@ -128,12 +128,16 @@ function App() {
     const canvasWidth = canvasRef.current.width;
     const canvasHeight = canvasRef.current.height;
   
-    // Преобразование координат из видео в canvas (с нормализацией под Three.js)
-    const normalizedX = (x / videoWidth) * canvasWidth;
-    const normalizedY = (y / videoHeight) * canvasHeight;
+    // Преобразование координат с учетом пропорций
+    const scaleX = canvasWidth / videoWidth;
+    const scaleY = canvasHeight / videoHeight;
   
-    return { x: normalizedX, y: normalizedY };
+    return {
+      x: x * scaleX,
+      y: y * scaleY,
+    };
   };
+  
   
 
   const detectPose = () => {
@@ -210,13 +214,18 @@ function App() {
   
   const drawSkeleton = (keypoints, minConfidence, ctx) => {
     const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
-
+  
     adjacentKeyPoints.forEach(([from, to]) => {
+      const startX = (from.position.x / webcamRef.current.video.videoWidth) * canvasRef.current.width;
+      const startY = (from.position.y / webcamRef.current.video.videoHeight) * canvasRef.current.height;
+      const endX = (to.position.x / webcamRef.current.video.videoWidth) * canvasRef.current.width;
+      const endY = (to.position.y / webcamRef.current.video.videoHeight) * canvasRef.current.height;
+  
       ctx.beginPath();
-      ctx.moveTo(from.position.x, from.position.y);
-      ctx.lineTo(to.position.x, to.position.y);
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
       ctx.lineWidth = 6;
-      ctx.strokeStyle = 'rgb(0, 255, 0)';
+      ctx.strokeStyle = "rgb(0, 255, 0)";
       ctx.stroke();
     });
   };
@@ -311,27 +320,27 @@ function App() {
   
         {/* Canvas для отображения позы и ключевых точек */}
         <canvas
-          ref={canvasRef}
-          style={{
-            position: "absolute",
-            marginLeft: "auto",
-            marginRight: "auto",
-            left: 0,
-            right: 0,
-            textAlign: "center",
-            zIndex: 2,
-            width: isMobile ? "100%" : "1280px",
-            height: isMobile ? "100%" : "720px",
-          }}
-        />
+  ref={canvasRef}
+  style={{
+    position: "absolute",
+    marginLeft: "auto",
+    marginRight: "auto",
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    zIndex: 2,
+    width: isMobile ? "100%" : "1280px", // Масштабируем под экран
+    height: isMobile ? "auto" : "720px", // Высота будет адаптироваться
+  }}
+/>
   
         {/* Поток с веб-камеры */}
         <Webcam
   ref={webcamRef}
   videoConstraints={{
     facingMode: "environment",
-    width: isMobile ? (isPortrait ? 480 : 640) : 1280,
-    height: isMobile ? (isPortrait ? 640 : 480) : 720,
+    width: isMobile ? 720 : 1280, // Увеличиваем ширину на мобильных
+    height: isMobile ? 1280 : 720, // Увеличиваем высоту на мобильных
   }}
   style={{
     position: "absolute",
@@ -341,8 +350,8 @@ function App() {
     right: 0,
     textAlign: "center",
     zIndex: 1,
-    width: isMobile ? (isPortrait ? "100%" : "100%") : "1280px",
-    height: isMobile ? (isPortrait ? "100%" : "100%") : "720px",
+    width: isMobile ? "100%" : "1280px", // Масштабируем под экран
+    height: isMobile ? "auto" : "720px", // Высота будет адаптироваться
   }}
 />
 

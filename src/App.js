@@ -18,6 +18,8 @@ const smoothTransition = (current, target, alpha = 0.15) => ({
   z: lerp(current.z, target.z, alpha),
 });
 
+const isPortrait = window.innerHeight > window.innerWidth;
+
 // Компонент для отрисовки 3D модели одежды
 function ClothingOverlay({ modelPath, position, scale }) {
   const { scene } = useGLTF(modelPath);
@@ -118,6 +120,18 @@ function App() {
     );
   };
 
+  const convertPosenetToThreeJS = (x, y, videoWidth, videoHeight) => {
+    const canvasWidth = canvasRef.current.width;
+    const canvasHeight = canvasRef.current.height;
+  
+    // Преобразование координат из видео в canvas (с нормализацией под Three.js)
+    const normalizedX = (x / videoWidth) * canvasWidth;
+    const normalizedY = (y / videoHeight) * canvasHeight;
+  
+    return { x: normalizedX, y: normalizedY };
+  };
+  
+
   const detectPose = () => {
     const updatePose = async () => {
       const now = Date.now();
@@ -125,55 +139,70 @@ function App() {
         requestAnimationFrame(updatePose);
         return;
       }
-
+  
       if (
         webcamRef.current &&
         webcamRef.current.video.readyState === 4 &&
         netRef.current
       ) {
         const video = webcamRef.current.video;
-        const videoWidth = video.videoWidth;
-        const videoHeight = video.videoHeight;
-
+  
+        // Ориентация экрана
+        const isPortrait = window.innerHeight > window.innerWidth;
+  
+        const videoWidth = isPortrait ? 480 : 640; // Подстройка под ориентацию
+        const videoHeight = isPortrait ? 640 : 480;
+  
         webcamRef.current.video.width = videoWidth;
         webcamRef.current.video.height = videoHeight;
-
+  
         const pose = await netRef.current.estimateSinglePose(video);
-
+  
         drawCanvas(pose, video, videoWidth, videoHeight, canvasRef);
         updateVisibleKeypoints(pose.keypoints);
-
+  
         const leftShoulder = pose.keypoints.find((point) => point.part === "leftShoulder");
         const rightShoulder = pose.keypoints.find((point) => point.part === "rightShoulder");
         const leftHip = pose.keypoints.find((point) => point.part === "leftHip");
         const rightHip = pose.keypoints.find((point) => point.part === "rightHip");
-
+  
         if (leftShoulder && rightShoulder && leftHip && rightHip) {
-          const shoulderWidth = Math.abs(leftShoulder.position.x - rightShoulder.position.x);
-          const torsoHeight = Math.abs(leftHip.position.y - leftShoulder.position.y);
-
+          const points = [leftShoulder, rightShoulder, leftHip, rightHip].map((point) =>
+            convertPosenetToThreeJS(
+              point.position.x,
+              point.position.y,
+              videoWidth,
+              videoHeight
+            )
+          );
+  
+          const xValues = points.map((p) => p.x);
+          const yValues = points.map((p) => p.y);
+  
+          const centerX = (Math.max(...xValues) + Math.min(...xValues)) / 2;
+          const centerY = (Math.max(...yValues) + Math.min(...yValues)) / 2;
+  
+          const shoulderWidth = Math.abs(points[0].x - points[1].x);
+          const torsoHeight = Math.abs(points[2].y - points[0].y);
+  
           const scaleFactor = isMobile
-            ? Math.max(shoulderWidth * 1.5, torsoHeight * 1.5)
-            : Math.max(shoulderWidth * 2.5, torsoHeight * 2.5);
-
-          const targetPosition = {
-            x: (leftShoulder.position.x + rightShoulder.position.x) / 2,
-            y: (leftShoulder.position.y + leftHip.position.y) / 2,
-            z: 0,
-          };
-
+            ? Math.max(shoulderWidth, torsoHeight) * 1.2
+            : Math.max(shoulderWidth * 2, torsoHeight * 2);
+  
+          const targetPosition = { x: centerX, y: centerY - torsoHeight / 2, z: 0 };
           const smoothedPosition = smoothTransition(modelPosition, targetPosition, 0.15);
-
+  
           setModelPosition(smoothedPosition);
           setScale(scaleFactor);
         }
-
+  
         setLastPoseTime(now);
       }
       requestAnimationFrame(updatePose);
     };
     requestAnimationFrame(updatePose);
   };
+  
   
   const drawSkeleton = (keypoints, minConfidence, ctx) => {
     const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
@@ -192,15 +221,15 @@ function App() {
     const ctx = canvas.current.getContext("2d");
     const canvasWidth = canvas.current.width;
     const canvasHeight = canvas.current.height;
-
-    canvas.current.width = isMobile ? videoWidth : 1280;
-    canvas.current.height = isMobile ? videoHeight : 720;
-
+  
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-    drawKeypoints(pose.keypoints, 0.5, ctx);
+  
+    canvas.current.width = videoWidth;
+    canvas.current.height = videoHeight;
+  
     drawSkeleton(pose.keypoints, 0.5, ctx);
   };
+  
 
   return (
     <div className="App">
@@ -294,24 +323,25 @@ function App() {
   
         {/* Поток с веб-камеры */}
         <Webcam
-          ref={webcamRef}
-          videoConstraints={{
-            facingMode: "environment",
-            width: isMobile ? window.innerWidth : 1280,
-            height: isMobile ? window.innerHeight : 720,
-          }}
-          style={{
-            position: "absolute",
-            marginLeft: "auto",
-            marginRight: "auto",
-            left: 0,
-            right: 0,
-            textAlign: "center",
-            zIndex: 1,
-            width: isMobile ? "100%" : "1280px",
-            height: isMobile ? "100%" : "720px",
-          }}
-        />
+  ref={webcamRef}
+  videoConstraints={{
+    facingMode: "environment",
+    width: isMobile ? (isPortrait ? 480 : 640) : 1280,
+    height: isMobile ? (isPortrait ? 640 : 480) : 720,
+  }}
+  style={{
+    position: "absolute",
+    marginLeft: "auto",
+    marginRight: "auto",
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    zIndex: 1,
+    width: isMobile ? (isPortrait ? "100%" : "100%") : "1280px",
+    height: isMobile ? (isPortrait ? "100%" : "100%") : "720px",
+  }}
+/>
+
   
         {/* Модель одежды */}
         {selectedModel && (

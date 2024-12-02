@@ -73,27 +73,31 @@ function App() {
   };
 
   const startCamera = async () => {
-    if (!isCameraInitialized) {
-      setIsCameraInitialized(true);
-
-      const videoConstraints = {
-        facingMode: "environment",
-        width: isMobile ? window.innerWidth : 1280,
-        height: isMobile ? window.innerHeight : 720,
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraints,
-      });
-
-      webcamRef.current.video.srcObject = stream;
+    if (!isCameraInitialized && webcamRef.current) {
+      try {
+        const videoConstraints = {
+          facingMode: "environment",
+          width: isMobile ? window.innerWidth : 1280,
+          height: isMobile ? window.innerHeight : 720,
+        };
+  
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: videoConstraints,
+        });
+  
+        webcamRef.current.video.srcObject = stream;
+        setIsCameraInitialized(true); // Устанавливаем флаг после успешного запуска камеры
+      } catch (error) {
+        console.error("Ошибка доступа к камере: ", error);
+      }
     }
   };
 
   useEffect(() => {
-    startCamera();
+    startCamera(); // Запускаем камеру один раз
+  
     return () => {
-      stopCamera();
+      stopCamera(); // Очищаем ресурсы при размонтировании
     };
   }, []);
 

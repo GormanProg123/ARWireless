@@ -47,3 +47,28 @@
     display: block;
   }
 }
+
+@media (max-width: 768px) {
+  .webcam {
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .canvas {
+    width: 100vw;
+    height: 100vh;
+  }
+}
+
+/* Для ПК (ширина больше 768px) */
+@media (min-width: 769px) {
+  .webcam {
+    width: 1280px;
+    height: 720px;
+  }
+
+  .canvas {
+    width: 1280px;
+    height: 720px;
+  }
+}

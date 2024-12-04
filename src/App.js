@@ -24,18 +24,17 @@ const isPortrait = window.innerHeight > window.innerWidth;
 function ClothingOverlay({ modelPath, position, scale }) {
   const { scene } = useGLTF(modelPath);
 
-  if (scene) {
-    scene.position.set(position.x, position.y, position.z);
-    scene.scale.set(scale, scale, scale);
-  }
+  useEffect(() => {
+    if (scene) {
+      console.log("Updating model position in Three.js:", position);
+      scene.position.set(position.x, position.y, position.z);
+      scene.scale.set(scale, scale, scale);
+    }
+  }, [scene, position, scale]);
 
-  return modelPath ? (
-    <>
-      <primitive object={scene} />
-      <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
-    </>
-  ) : null;
+  return modelPath ? <primitive object={scene} /> : null;
 }
+
 
 const lerpKeypoint = (current, target, alpha = 0.5) => ({
   x: lerp(current.x, target.x, alpha),
@@ -52,6 +51,8 @@ function App() {
   const [scale, setScale] = useState(1);
   const [lastPoseTime, setLastPoseTime] = useState(0);
   const [isCameraInitialized, setIsCameraInitialized] = useState(false);
+  const [isTorsoDetected, setIsTorsoDetected] = useState(false);
+
 
   // Определение устройства (мобильное или ПК)
   const isMobile = window.innerWidth <= 768;
@@ -105,106 +106,157 @@ function App() {
   useEffect(() => {
     startCamera();
     return () => {
-      stopCamera();
+      if (webcamRef.current && webcamRef.current.video.srcObject) {
+        const stream = webcamRef.current.video.srcObject;
+        const tracks = stream.getTracks();
+        tracks.forEach((track) => track.stop());
+        webcamRef.current.video.srcObject = null;
+      }
     };
   }, []);
 
   const updateVisibleKeypoints = (keypoints) => {
-    const MIN_SCORE_THRESHOLD = 0.7;
+    const MIN_SCORE_THRESHOLD = 0.5; // UPDATED: Понижен порог уверенности для более точного отслеживания.
     const filteredKeypoints = keypoints.filter((point) => point.score > MIN_SCORE_THRESHOLD);
-
+  
     setVisibleKeypoints((prevKeypoints) =>
       filteredKeypoints.map((newPoint) => {
         const previous = prevKeypoints.find((p) => p.part === newPoint.part);
         if (previous) {
           return {
             ...newPoint,
-            position: lerpKeypoint(previous.position, newPoint.position, 0.5),
+            position: lerpKeypoint(previous.position, newPoint.position, 0.7), // UPDATED: Увеличена плавность.
           };
         }
         return newPoint;
       })
     );
   };
+  
 
   // Конвертация позы в координаты для Three.js
-const convertPosenetToThreeJS = (x, y, videoWidth, videoHeight, canvasWidth, canvasHeight) => {
-  const normalizedX = ((x / videoWidth) * canvasWidth) / canvasWidth * 2 - 1;
-  const normalizedY = -(((y / videoHeight) * canvasHeight) / canvasHeight * 2 - 1);
-  return { x: normalizedX, y: normalizedY };
-};
+  const convertPosenetToThreeJS = (x, y, videoWidth, videoHeight, canvasWidth, canvasHeight) => {
+    const normalizedX = ((x / videoWidth) * canvasWidth - canvasWidth / 2) / canvasWidth;
+    const normalizedY = -((y / videoHeight) * canvasHeight - canvasHeight / 2) / canvasHeight;
+    return { x: normalizedX, y: normalizedY, z: 0.1 }; // UPDATED: Добавлено небольшое смещение по оси Z.
+  };
+  
+  const calculateMidPoint = (point1, point2) => ({
+    x: (point1.position.x + point2.position.x) / 2,
+    y: (point1.position.y + point2.position.y) / 2,
+  });
 
+  
+  
 
-const detectPose = () => {
-  const updatePose = async () => {
-    const now = Date.now();
-    if (now - lastPoseTime < 100) {
-      requestAnimationFrame(updatePose);
-      return;
-    }
-
-    if (
-      webcamRef.current &&
-      webcamRef.current.video.readyState === 4 &&
-      netRef.current
-    ) {
-      const video = webcamRef.current.video;
-      const videoWidth = video.videoWidth;
-      const videoHeight = video.videoHeight;
-      const canvasWidth = canvasRef.current.width;
-      const canvasHeight = canvasRef.current.height;
-
-      webcamRef.current.video.width = videoWidth;
-      webcamRef.current.video.height = videoHeight;
-
-      const pose = await netRef.current.estimateSinglePose(video);
-
-      drawCanvas(pose, video, videoWidth, videoHeight, canvasRef);
-      updateVisibleKeypoints(pose.keypoints);
-
-      const leftShoulder = pose.keypoints.find((point) => point.part === "leftShoulder");
-      const rightShoulder = pose.keypoints.find((point) => point.part === "rightShoulder");
-      const leftHip = pose.keypoints.find((point) => point.part === "leftHip");
-      const rightHip = pose.keypoints.find((point) => point.part === "rightHip");
-
-      if (leftShoulder && rightShoulder && leftHip && rightHip) {
-        const points = [leftShoulder, rightShoulder, leftHip, rightHip].map(
-          (point) =>
-            convertPosenetToThreeJS(
-              point.position.x,
-              point.position.y,
-              videoWidth,
-              videoHeight,
-              canvasWidth,
-              canvasHeight
-            )
-        );
-
-        const xValues = points.map((p) => p.x);
-        const yValues = points.map((p) => p.y);
-
-        const centerX = (Math.max(...xValues) + Math.min(...xValues)) / 2;
-        const centerY = (Math.max(...yValues) + Math.min(...yValues)) / 2;
-
-        const shoulderWidth = Math.abs(points[0].x - points[1].x);
-        const torsoHeight = Math.abs(points[2].y - points[0].y);
-
-        const scaleFactor = Math.max(shoulderWidth * 2.5, torsoHeight * 2.5);
-        const targetPosition = { x: centerX, y: centerY - torsoHeight / 2, z: 0 };
-        const smoothedPosition = smoothTransition(modelPosition, targetPosition, 0.15);
-
-        setModelPosition(smoothedPosition);
-        setScale(scaleFactor);
+  const detectPose = () => {
+    const updatePose = async () => {
+      const now = Date.now();
+      if (now - lastPoseTime < 100) {
+        requestAnimationFrame(updatePose);
+        return;
       }
-
+  
+      if (
+        webcamRef.current &&
+        webcamRef.current.video.readyState === 4 &&
+        netRef.current
+      ) {
+        const video = webcamRef.current.video;
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+        const canvasWidth = canvasRef.current.width;
+        const canvasHeight = canvasRef.current.height;
+  
+        webcamRef.current.video.width = videoWidth;
+        webcamRef.current.video.height = videoHeight;
+  
+        const pose = await netRef.current.estimateSinglePose(video);
+  
+        drawCanvas(pose, video, videoWidth, videoHeight, canvasRef);
+        updateVisibleKeypoints(pose.keypoints);
+  
+        // Пытаемся найти ключевые точки торса с минимальной уверенностью
+        const leftShoulder = pose.keypoints.find((point) => point.part === "leftShoulder");
+        const rightShoulder = pose.keypoints.find((point) => point.part === "rightShoulder");
+        const leftHip = pose.keypoints.find((point) => point.part === "leftHip");
+        const rightHip = pose.keypoints.find((point) => point.part === "rightHip");
+  
+        // Проверяем, если хотя бы одна ключевая точка имеет низкую уверенность или отсутствует
+        const keypointsDetected = 
+          leftShoulder && rightShoulder && leftHip && rightHip &&
+          leftShoulder.score > 0.5 &&
+          rightShoulder.score > 0.5 &&
+          leftHip.score > 0.5 &&
+          rightHip.score > 0.5;
+  
+        if (!keypointsDetected) {
+          // Если недостаточно уверенности, не обновляем торс
+          setIsTorsoDetected(false);
+          requestAnimationFrame(updatePose);  // Пропускаем обновление
+          return;
+        }
+  
+        // Если уверенность достаточна, обновляем отслеживание
+        setIsTorsoDetected(true);
+  
+        // Находим середину плеч и бедер
+        const midShoulder = {
+          x: (leftShoulder.position.x + rightShoulder.position.x) / 2,
+          y: (leftShoulder.position.y + rightShoulder.position.y) / 2,
+        };
+  
+        const midHip = {
+          x: (leftHip.position.x + rightHip.position.x) / 2,
+          y: (leftHip.position.y + rightHip.position.y) / 2,
+        };
+  
+        const centerTorso = {
+          x: (midShoulder.x + midHip.x) / 2,
+          y: (midShoulder.y + midHip.y) / 2,
+        };
+  
+        // Приведение к координатам Three.js
+        const targetPosition = convertPosenetToThreeJS(
+          centerTorso.x,
+          centerTorso.y,
+          videoWidth,
+          videoHeight,
+          canvasWidth,
+          canvasHeight
+        );
+  
+        // Вычисление масштабирования по высоте торса и ширине плеч
+        const torsoHeight = Math.abs(midHip.y - midShoulder.y);
+        const shoulderWidth = Math.abs(leftShoulder.position.x - rightShoulder.position.x);
+        const relativeHeightScale = torsoHeight / videoHeight;
+        const relativeWidthScale = shoulderWidth / videoWidth;
+  
+        // Базовый масштаб и динамическое изменение масштаба
+        const baseScale = 1.5;
+        const dynamicScale = baseScale + (relativeHeightScale + relativeWidthScale) * 2;
+        const finalScale = Math.min(dynamicScale, 3.5);
+  
+        // Обновление позиции и масштаба
+        const adjustedPosition = {
+          ...targetPosition,
+          z: targetPosition.z + 0.2, // Немного смещаем по оси Z
+        };
+  
+        const smoothedPosition = smoothTransition(modelPosition, adjustedPosition, 0.15);
+  
+        setModelPosition(smoothedPosition);
+        setScale(finalScale);
+      }
+  
       setLastPoseTime(now);
-    }
+      requestAnimationFrame(updatePose);
+    };
     requestAnimationFrame(updatePose);
   };
-  requestAnimationFrame(updatePose);
-};
-
-
+  
+  
+  
   const drawCanvas = (pose, video, videoWidth, videoHeight, canvas) => {
     const ctx = canvas.current.getContext("2d");
     const canvasWidth = canvas.current.width;
@@ -273,7 +325,7 @@ const detectPose = () => {
               <p>Select a model from the menu.</p>
             )}
           </div>
-  
+          
           {/* Информация о ключевых точках */}
           <div
             className="keypoints-info"
@@ -305,7 +357,32 @@ const detectPose = () => {
             )}
           </div>
         </div>
-  
+        
+        <div
+          className="torso-info"
+          style={{
+            position: "absolute",
+            bottom: "10px",
+            left: "10px",
+            padding: "10px",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            color: "white",
+            borderRadius: "8px",
+            display: isMobile ? "none" : "block", 
+          }}
+        >
+          <h3>Torso Detection:</h3>
+          <p>
+            {isTorsoDetected ? (
+              <>
+                <span style={{ color: "green" }}>✔ Torso detected</span>
+              </>
+            ) : (
+              <span style={{ color: "red" }}>❌ Torso not detected</span>
+            )}
+          </p>
+        </div>
+
         {/* Canvas для отображения позы и ключевых точек */}
         <canvas
           ref={canvasRef}

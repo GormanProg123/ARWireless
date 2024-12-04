@@ -58,8 +58,8 @@ function App() {
   const isMobile = window.innerWidth <= 768;
 
   // Увеличиваем размеры камеры для телефона
-  const videoWidth = isMobile ? (isPortrait ? 480 : 720) : 1280;
-  const videoHeight = isMobile ? (isPortrait ? 800 : 540) : 720;
+  const videoWidth = isMobile ? (isPortrait ? 864 : 1280) : 1280;
+  const videoHeight = isMobile ? (isPortrait ? 1536 : 720) : 720;
 
   useEffect(() => {
     const loadPosenet = async () => {
@@ -138,8 +138,9 @@ function App() {
   const convertPosenetToThreeJS = (x, y, videoWidth, videoHeight, canvasWidth, canvasHeight) => {
     const normalizedX = ((x / videoWidth) * canvasWidth - canvasWidth / 2) / canvasWidth;
     const normalizedY = -((y / videoHeight) * canvasHeight - canvasHeight / 2) / canvasHeight;
-    return { x: normalizedX, y: normalizedY, z: 0.1 }; // UPDATED: Добавлено небольшое смещение по оси Z.
+    return { x: normalizedX, y: normalizedY, z: 0.1 }; // Z оставляем небольшим
   };
+  
   
   const calculateMidPoint = (point1, point2) => ({
     x: (point1.position.x + point2.position.x) / 2,
@@ -272,14 +273,17 @@ function App() {
 
   
   const drawSkeleton = (keypoints, minConfidence, ctx) => {
+    const scaleX = canvasRef.current.width / videoWidth;
+    const scaleY = canvasRef.current.height / videoHeight;
+  
     const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
-
+  
     adjacentKeyPoints.forEach(([from, to]) => {
       ctx.beginPath();
-      ctx.moveTo(from.position.x, from.position.y);
-      ctx.lineTo(to.position.x, to.position.y);
+      ctx.moveTo(from.position.x * scaleX, from.position.y * scaleY);
+      ctx.lineTo(to.position.x * scaleX, to.position.y * scaleY);
       ctx.lineWidth = 6;
-      ctx.strokeStyle = 'rgb(0, 255, 0)';
+      ctx.strokeStyle = "rgb(0, 255, 0)";
       ctx.stroke();
     });
   };
@@ -394,8 +398,8 @@ function App() {
             right: 0,
             textAlign: "center",
             zIndex: 2,
-            width: isMobile ? "100%" : "1280px",
-            height: isMobile ? "100%" : "720px",
+            width: isMobile ? "120%" : "1280px",
+            height: isMobile ? "150%" : "720px",
           }}
         />
   
@@ -404,8 +408,8 @@ function App() {
   ref={webcamRef}
   videoConstraints={{
     facingMode: "environment",
-    width: isMobile ? 864 : 1280,  // Увеличиваем ширину на мобильных устройствах (1.2x от 720)
-    height: isMobile ? 1536 : 720, // Увеличиваем высоту на мобильных устройствах (1.2x от 1280)
+    width: isMobile ? 864 : 1280,
+    height: isMobile ? 1536 : 720,
   }}
   style={{
     position: "absolute",
@@ -415,8 +419,8 @@ function App() {
     right: 0,
     textAlign: "center",
     zIndex: 1,
-    width: isMobile ? "120%" : "1280px",  // Увеличиваем ширину на мобильных устройствах
-    height: isMobile ? "auto" : "720px",  // Высота будет адаптироваться
+    width: isMobile ? "120%" : "1280px",
+    height: isMobile ? "auto" : "720px",
   }}
 />
 

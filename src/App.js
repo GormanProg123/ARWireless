@@ -127,11 +127,20 @@ function App() {
 
   // Конвертация позы в координаты для Three.js
   const convertPosenetToThreeJS = (x, y, videoWidth, videoHeight, canvasWidth, canvasHeight) => {
-    // Применяем масштабирование
-    const normalizedX = ((x / videoWidth) * canvasWidth - canvasWidth / 2) / canvasWidth;
-    const normalizedY = -((y / videoHeight) * canvasHeight - canvasHeight / 2) / canvasHeight;
-    return { x: normalizedX, y: normalizedY, z: 0.1 }; // Z оставляем небольшим
+    const scaleX = canvasWidth / videoWidth;
+    const scaleY = canvasHeight / videoHeight;
+    
+    // Преобразуем координаты
+    const normalizedX = x * scaleX;
+    const normalizedY = y * scaleY;
+    
+    return {
+      x: normalizedX - canvasWidth / 2,
+      y: canvasHeight / 2 - normalizedY,
+      z: 0.1, // Z-координата для Three.js
+    };
   };
+  
   
   
   const detectPose = () => {

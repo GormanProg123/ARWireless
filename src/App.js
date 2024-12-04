@@ -219,19 +219,19 @@ function App() {
   
         // Базовый масштаб и динамическое изменение масштаба
         const baseScale = 1.5;
-        const dynamicScale = baseScale + (relativeHeightScale + relativeWidthScale) * 2;
-        const finalScale = Math.min(dynamicScale, 3.5);
-  
-        // Обновление позиции и масштаба
-        const adjustedPosition = {
-          ...targetPosition,
-          z: targetPosition.z + 0.2, // Немного смещаем по оси Z
-        };
-  
-        const smoothedPosition = smoothTransition(modelPosition, adjustedPosition, 0.15);
-  
-        setModelPosition(smoothedPosition);
-        setScale(finalScale);
+        // Вычисление масштаба для мобильных устройств
+const dynamicScale = (baseScale + (relativeHeightScale + relativeWidthScale) * 2) * (isMobile ? 0.8 : 1);
+const finalScale = Math.min(dynamicScale, 3.5);
+
+// Установка позиции и масштаба
+const adjustedPosition = {
+  ...targetPosition,
+  z: targetPosition.z + 0.2, // Немного смещаем по оси Z
+};
+const smoothedPosition = smoothTransition(modelPosition, adjustedPosition, 0.15);
+setModelPosition(smoothedPosition);
+setScale(finalScale);
+
       }
   
       setLastPoseTime(now);
@@ -264,20 +264,26 @@ function App() {
     const canvasWidth = canvasRef.current.width;
     const canvasHeight = canvasRef.current.height;
     
-    // Применяем масштабирование, если оно есть (например, на мобильных устройствах)
+    // Применяем масштабирование для мобильных устройств
     const scaleX = canvasWidth / videoWidth;
     const scaleY = canvasHeight / videoHeight;
     
+    // Дополнительное уменьшение масштаба для мобильных устройств
+    const mobileScaleFactor = isMobile ? 0.5 : 1;  // Уменьшаем масштаб на мобильных устройствах
+  
+    // Масштабируем координаты для отображения на канвасе
+    const adjX = scaleX * mobileScaleFactor;
+    const adjY = scaleY * mobileScaleFactor;
+  
     const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
     
     adjacentKeyPoints.forEach(([from, to]) => {
       ctx.beginPath();
       
-      // Применяем масштабирование для каждой ключевой точки
-      const fromX = from.position.x * scaleX;
-      const fromY = from.position.y * scaleY;
-      const toX = to.position.x * scaleX;
-      const toY = to.position.y * scaleY;
+      const fromX = from.position.x * adjX;
+      const fromY = from.position.y * adjY;
+      const toX = to.position.x * adjX;
+      const toY = to.position.y * adjY;
       
       ctx.moveTo(fromX, fromY);
       ctx.lineTo(toX, toY);
@@ -286,6 +292,8 @@ function App() {
       ctx.stroke();
     });
   };
+  
+  
   
 
   return (

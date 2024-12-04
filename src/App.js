@@ -73,15 +73,6 @@ function App() {
     loadPosenet();
   }, []);
 
-  const stopCamera = () => {
-    if (webcamRef.current && webcamRef.current.video.srcObject) {
-      const stream = webcamRef.current.video.srcObject;
-      const tracks = stream.getTracks();
-      tracks.forEach((track) => track.stop());
-      webcamRef.current.video.srcObject = null;
-    }
-  };
-
   const startCamera = async () => {
     if (!isCameraInitialized && webcamRef.current) {
       try {
@@ -136,20 +127,13 @@ function App() {
 
   // Конвертация позы в координаты для Three.js
   const convertPosenetToThreeJS = (x, y, videoWidth, videoHeight, canvasWidth, canvasHeight) => {
+    // Применяем масштабирование
     const normalizedX = ((x / videoWidth) * canvasWidth - canvasWidth / 2) / canvasWidth;
     const normalizedY = -((y / videoHeight) * canvasHeight - canvasHeight / 2) / canvasHeight;
     return { x: normalizedX, y: normalizedY, z: 0.1 }; // Z оставляем небольшим
   };
   
   
-  const calculateMidPoint = (point1, point2) => ({
-    x: (point1.position.x + point2.position.x) / 2,
-    y: (point1.position.y + point2.position.y) / 2,
-  });
-
-  
-  
-
   const detectPose = () => {
     const updatePose = async () => {
       const now = Date.now();
@@ -273,20 +257,36 @@ function App() {
 
   
   const drawSkeleton = (keypoints, minConfidence, ctx) => {
-    const scaleX = canvasRef.current.width / videoWidth;
-    const scaleY = canvasRef.current.height / videoHeight;
-  
+    const video = webcamRef.current.video;
+    const videoWidth = video.videoWidth;
+    const videoHeight = video.videoHeight;
+    
+    const canvasWidth = canvasRef.current.width;
+    const canvasHeight = canvasRef.current.height;
+    
+    // Применяем масштабирование, если оно есть (например, на мобильных устройствах)
+    const scaleX = canvasWidth / videoWidth;
+    const scaleY = canvasHeight / videoHeight;
+    
     const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
-  
+    
     adjacentKeyPoints.forEach(([from, to]) => {
       ctx.beginPath();
-      ctx.moveTo(from.position.x * scaleX, from.position.y * scaleY);
-      ctx.lineTo(to.position.x * scaleX, to.position.y * scaleY);
+      
+      // Применяем масштабирование для каждой ключевой точки
+      const fromX = from.position.x * scaleX;
+      const fromY = from.position.y * scaleY;
+      const toX = to.position.x * scaleX;
+      const toY = to.position.y * scaleY;
+      
+      ctx.moveTo(fromX, fromY);
+      ctx.lineTo(toX, toY);
       ctx.lineWidth = 6;
       ctx.strokeStyle = "rgb(0, 255, 0)";
       ctx.stroke();
     });
   };
+  
 
   return (
     <div className="App">

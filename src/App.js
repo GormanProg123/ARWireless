@@ -58,8 +58,8 @@ function App() {
   const isMobile = window.innerWidth <= 768;
 
   // Увеличиваем размеры камеры для телефона
-  const videoWidth = isMobile ? (isPortrait ? 864 : 1280) : 1280;
-  const videoHeight = isMobile ? (isPortrait ? 1536 : 720) : 720;
+  const videoWidth = isMobile ? 718 : 1280;
+  const videoHeight = isMobile ? 762 : 720;
 
   useEffect(() => {
     const loadPosenet = async () => {
@@ -140,8 +140,6 @@ function App() {
       z: 0.1, // Z-координата для Three.js
     };
   };
-  
-  
   
   const detectPose = () => {
     const updatePose = async () => {
@@ -229,8 +227,8 @@ function App() {
         // Базовый масштаб и динамическое изменение масштаба
         const baseScale = 1.5;
         // Вычисление масштаба для мобильных устройств
-const dynamicScale = (baseScale + (relativeHeightScale + relativeWidthScale) * 2) * (isMobile ? 0.8 : 1);
-const finalScale = Math.min(dynamicScale, 3.5);
+        const dynamicScale = (baseScale + (relativeHeightScale + relativeWidthScale) * 2) * (isMobile ? 0.8 : 1);
+        const finalScale = Math.min(dynamicScale, 3.5);
 
 // Установка позиции и масштаба
 const adjustedPosition = {
@@ -258,10 +256,21 @@ setScale(finalScale);
 
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-    canvas.current.width = videoWidth;
-    canvas.current.height = videoHeight;
+    const scaleX = canvasWidth / videoWidth;
+    const scaleY = canvasHeight / videoHeight;
 
-    drawSkeleton(pose.keypoints, 0.5, ctx);
+    pose.keypoints.forEach((keypoint) => {
+      if (keypoint.score > 0.5) {
+        const x = keypoint.position.x * scaleX;
+        const y = keypoint.position.y * scaleY;
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = "red";
+        ctx.fill();
+      }
+    });
+
+    drawSkeleton(pose.keypoints, 0.5, ctx, scaleX, scaleY);
   };
 
   
@@ -406,40 +415,40 @@ setScale(finalScale);
 
         {/* Canvas для отображения позы и ключевых точек */}
         <canvas
-          ref={canvasRef}
-          style={{
-            position: "absolute",
-            marginLeft: "auto",
-            marginRight: "auto",
-            left: 0,
-            right: 0,
-            textAlign: "center",
-            zIndex: 2,
-            width: isMobile ? "120%" : "1280px",
-            height: isMobile ? "150%" : "720px",
-          }}
-        />
+        ref={canvasRef}
+        style={{
+          position: "absolute",
+          marginLeft: "auto",
+          marginRight: "auto",
+          left: 0,
+          right: 0,
+          textAlign: "center",
+          zIndex: 2,
+          width: isMobile ? "718px" : "1280px",
+          height: isMobile ? "762px" : "720px",
+        }}
+      />
   
         {/* Поток с веб-камеры */}
         <Webcam
-  ref={webcamRef}
-  videoConstraints={{
-    facingMode: "environment",
-    width: isMobile ? 864 : 1280,
-    height: isMobile ? 1536 : 720,
-  }}
-  style={{
-    position: "absolute",
-    marginLeft: "auto",
-    marginRight: "auto",
-    left: 0,
-    right: 0,
-    textAlign: "center",
-    zIndex: 1,
-    width: isMobile ? "120%" : "1280px",
-    height: isMobile ? "auto" : "720px",
-  }}
-/>
+        ref={webcamRef}
+        videoConstraints={{
+          facingMode: "environment",
+          width: videoWidth,
+          height: videoHeight,
+        }}
+        style={{
+          position: "absolute",
+          marginLeft: "auto",
+          marginRight: "auto",
+          left: 0,
+          right: 0,
+          textAlign: "center",
+          zIndex: 1,
+          width: isMobile ? "718px" : "1280px",
+          height: isMobile ? "762px" : "720px",
+        }}
+      />
 
   
         {/* Модель одежды */}

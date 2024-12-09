@@ -52,6 +52,8 @@ function App() {
   const [lastPoseTime, setLastPoseTime] = useState(0);
   const [isCameraInitialized, setIsCameraInitialized] = useState(false);
   const [isTorsoDetected, setIsTorsoDetected] = useState(false);
+  const [depthFactor, setDepthFactor] = useState(0.3); // Для управления глубиной
+  const [scaleFactor, setScaleFactor] = useState(1); // Для управления масштабом
 
 
   // Определение устройства (мобильное или ПК)
@@ -131,8 +133,9 @@ function App() {
     const scaleY = canvasHeight / videoHeight;
     
     // Преобразуем координаты
-    const normalizedX = x * scaleX;
-    const normalizedY = y * scaleY;
+    const scaleFactor = isMobile ? 1.5 : 1; // Увеличение масштаба для мобильных устройств
+    const normalizedX = (x * scaleX * scaleFactor);
+    const normalizedY = (y * scaleY * scaleFactor);
     
     return {
       x: normalizedX - canvasWidth / 2,
@@ -140,6 +143,11 @@ function App() {
       z: 0.1, // Z-координата для Three.js
     };
   };
+  
+  const computeDepth = (shoulderWidth) => {
+    return -shoulderWidth * depthFactor;
+  };
+  
   
   const detectPose = () => {
     const updatePose = async () => {
@@ -225,19 +233,21 @@ function App() {
         const relativeWidthScale = shoulderWidth / videoWidth;
   
         // Базовый масштаб и динамическое изменение масштаба
-        const baseScale = 1.5;
+        const baseScale = 2.5;
         // Вычисление масштаба для мобильных устройств
-        const dynamicScale = (baseScale + (relativeHeightScale + relativeWidthScale) * 2) * (isMobile ? 0.8 : 1);
-        const finalScale = Math.min(dynamicScale, 3.5);
+        const dynamicScale = (baseScale + (relativeHeightScale + relativeWidthScale) * 3) * (isMobile ? 0.7 : 1);
+        const finalScale = Math.min(dynamicScale, 3.5) * (isMobile ? 3.5 : 4);
 
-// Установка позиции и масштаба
-const adjustedPosition = {
-  ...targetPosition,
-  z: targetPosition.z + 0.2, // Немного смещаем по оси Z
-};
-const smoothedPosition = smoothTransition(modelPosition, adjustedPosition, 0.15);
-setModelPosition(smoothedPosition);
-setScale(finalScale);
+
+        const adjustedPosition = {
+          x: targetPosition.x,
+          y: targetPosition.y + (isMobile ? 20 : 10), // Увеличиваем смещение для мобильных устройств
+          z: computeDepth(shoulderWidth), 
+        };
+        
+        const smoothedPosition = smoothTransition(modelPosition, adjustedPosition, 0.15);
+        setModelPosition(smoothedPosition);
+        setScale(finalScale);
 
       }
   
@@ -287,27 +297,27 @@ setScale(finalScale);
     const scaleY = canvasHeight / videoHeight;
     
     // Дополнительное уменьшение масштаба для мобильных устройств
-    const mobileScaleFactor = isMobile ? 0.5 : 1;  // Уменьшаем масштаб на мобильных устройствах
-  
-    // Масштабируем координаты для отображения на канвасе
-    const adjX = scaleX * mobileScaleFactor;
-    const adjY = scaleY * mobileScaleFactor;
-  
-    const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
-    
-    adjacentKeyPoints.forEach(([from, to]) => {
-      ctx.beginPath();
-      
-      const fromX = from.position.x * adjX;
-      const fromY = from.position.y * adjY;
-      const toX = to.position.x * adjX;
-      const toY = to.position.y * adjY;
-      
-      ctx.moveTo(fromX, fromY);
-      ctx.lineTo(toX, toY);
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = "rgb(0, 255, 0)";
-      ctx.stroke();
+    const mobileScaleFactor = isMobile ? 0.8 : 1; // Для мобильных устройств делаем масштаб 80%
+
+  const adjX = scaleX * mobileScaleFactor;
+  const adjY = scaleY * mobileScaleFactor;
+
+  const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
+
+  adjacentKeyPoints.forEach(([from, to]) => {
+    ctx.beginPath();
+
+    // Скорректированные координаты с учетом scale и mobileScaleFactor
+    const fromX = from.position.x * adjX;
+    const fromY = from.position.y * adjY;
+    const toX = to.position.x * adjX;
+    const toY = to.position.y * adjY;
+
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "rgb(0, 255, 0)";
+    ctx.stroke();
     });
   };
   

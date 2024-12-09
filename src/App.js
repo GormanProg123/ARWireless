@@ -236,12 +236,12 @@ function App() {
         const baseScale = 2.5;
         // Вычисление масштаба для мобильных устройств
         const dynamicScale = (baseScale + (relativeHeightScale + relativeWidthScale) * 3) * (isMobile ? 0.7 : 1);
-        const finalScale = Math.min(dynamicScale, 3.5) * (isMobile ? 3.5 : 4);
-
+        const scaleFactorForMobile = isMobile ? 0.7 : 1;
+        const finalScale = Math.min(dynamicScale * scaleFactorForMobile, 3.5) * (isMobile ? 3.5 : 4);
 
         const adjustedPosition = {
           x: targetPosition.x,
-          y: targetPosition.y + (isMobile ? 20 : 10), // Увеличиваем смещение для мобильных устройств
+          y: targetPosition.y + (isMobile ? 20 : 10), // Для мобильных устройств увеличиваем смещение
           z: computeDepth(shoulderWidth), 
         };
         

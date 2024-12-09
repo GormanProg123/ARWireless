@@ -238,7 +238,7 @@ function App() {
         const dynamicScale = (baseScale + (relativeHeightScale + relativeWidthScale) * 3) * (isMobile ? 0.7 : 1);
         const scaleFactorForMobile = isMobile ? 0.7 : 1;
         const finalScale = Math.min(dynamicScale * scaleFactorForMobile, 3.5) * (isMobile ? 3.5 : 4);
-
+        
         const adjustedPosition = {
           x: targetPosition.x,
           y: targetPosition.y + (isMobile ? 20 : 10), // Для мобильных устройств увеличиваем смещение
@@ -482,7 +482,7 @@ function App() {
             <ClothingOverlay
               modelPath={selectedModel}
               position={modelPosition}
-              scale={isMobile ? scale * 0.8 : scale}
+              scale={isMobile ? scale * 0.5 : scale}
             />
           </Canvas>
         )}

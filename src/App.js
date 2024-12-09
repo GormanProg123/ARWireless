@@ -315,15 +315,12 @@ function App() {
 
     ctx.moveTo(fromX, fromY);
     ctx.lineTo(toX, toY);
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 4;
     ctx.strokeStyle = "rgb(0, 255, 0)";
     ctx.stroke();
     });
   };
   
-  
-  
-
   return (
     <div className="App">
       <header className="App-header">

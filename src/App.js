@@ -263,28 +263,30 @@ function App() {
     const ctx = canvas.current.getContext("2d");
     const canvasWidth = canvas.current.width;
     const canvasHeight = canvas.current.height;
-
+  
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
+  
     const scaleX = canvasWidth / videoWidth;
     const scaleY = canvasHeight / videoHeight;
-
+  
+    // Определение размера точек для мобильных устройств
+    const pointSize = isMobile ? 3 : 5; // Уменьшаем размер точек на мобильных устройствах
+  
     pose.keypoints.forEach((keypoint) => {
       if (keypoint.score > 0.5) {
         const x = keypoint.position.x * scaleX;
         const y = keypoint.position.y * scaleY;
         ctx.beginPath();
-        ctx.arc(x, y, 5, 0, 2 * Math.PI);
+        ctx.arc(x, y, pointSize, 0, 2 * Math.PI); // Используем уменьшенный размер точки
         ctx.fillStyle = "red";
         ctx.fill();
       }
     });
-
+  
     drawSkeleton(pose.keypoints, 0.5, ctx, scaleX, scaleY);
   };
-
   
-  const drawSkeleton = (keypoints, minConfidence, ctx) => {
+  const drawSkeleton = (keypoints, minConfidence, ctx, scaleX, scaleY) => {
     const video = webcamRef.current.video;
     const videoWidth = video.videoWidth;
     const videoHeight = video.videoHeight;
@@ -292,35 +294,48 @@ function App() {
     const canvasWidth = canvasRef.current.width;
     const canvasHeight = canvasRef.current.height;
     
-    // Применяем масштабирование для мобильных устройств
-    const scaleX = canvasWidth / videoWidth;
-    const scaleY = canvasHeight / videoHeight;
+    // Для мобильных устройств добавляем масштабирование для всего скелета
+    const mobileScaleFactor = isMobile ? 0.8 : 1;  // Для мобильных устройств масштабируем на 80%
     
-    // Дополнительное уменьшение масштаба для мобильных устройств
-    const mobileScaleFactor = isMobile ? 0.8 : 1; // Для мобильных устройств делаем масштаб 80%
-
-  const adjX = scaleX * mobileScaleFactor;
-  const adjY = scaleY * mobileScaleFactor;
-
-  const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
-
-  adjacentKeyPoints.forEach(([from, to]) => {
-    ctx.beginPath();
-
-    // Скорректированные координаты с учетом scale и mobileScaleFactor
-    const fromX = from.position.x * adjX;
-    const fromY = from.position.y * adjY;
-    const toX = to.position.x * adjX;
-    const toY = to.position.y * adjY;
-
-    ctx.moveTo(fromX, fromY);
-    ctx.lineTo(toX, toY);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "rgb(0, 255, 0)";
-    ctx.stroke();
+    const adjX = scaleX * mobileScaleFactor;
+    const adjY = scaleY * mobileScaleFactor;
+  
+    // Уменьшаем толщину линий для мобильных устройств
+    const lineWidth = isMobile ? 2 : 4; // Меньше для мобильных устройств
+    
+    // Получаем все смежные точки для рисования линий
+    const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
+    
+    adjacentKeyPoints.forEach(([from, to]) => {
+      ctx.beginPath();
+  
+      // Корректируем координаты с учетом масштаба и мобильной адаптации
+      const fromX = from.position.x * adjX + 5;  // Небольшой отступ для точности
+      const fromY = from.position.y * adjY + 5;  // Небольшой отступ для точности
+      const toX = to.position.x * adjX + 5;      // Небольшой отступ для точности
+      const toY = to.position.y * adjY + 5;      // Небольшой отступ для точности
+      
+      ctx.moveTo(fromX, fromY);
+      ctx.lineTo(toX, toY);
+      ctx.lineWidth = lineWidth;  // Устанавливаем толщину линии
+      ctx.strokeStyle = "rgb(0, 255, 0)";
+      ctx.stroke();
+    });
+  
+    // Отображаем ключевые точки (если необходимо)
+    keypoints.forEach((keypoint) => {
+      if (keypoint.score > minConfidence) {
+        const x = keypoint.position.x * adjX;
+        const y = keypoint.position.y * adjY;
+        
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, 2 * Math.PI); // Уменьшаем размер точек на мобильных устройствах
+        ctx.fillStyle = "red";
+        ctx.fill();
+      }
     });
   };
-  
+    
   return (
     <div className="App">
       <header className="App-header">

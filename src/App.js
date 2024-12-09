@@ -286,55 +286,48 @@ function App() {
     drawSkeleton(pose.keypoints, 0.5, ctx, scaleX, scaleY);
   };
   
-  const drawSkeleton = (keypoints, minConfidence, ctx, scaleX, scaleY) => {
-    const video = webcamRef.current.video;
-    const videoWidth = video.videoWidth;
-    const videoHeight = video.videoHeight;
-    
-    const canvasWidth = canvasRef.current.width;
-    const canvasHeight = canvasRef.current.height;
-    
-    // Для мобильных устройств добавляем масштабирование для всего скелета
-    const mobileScaleFactor = isMobile ? 0.8 : 1;  // Для мобильных устройств масштабируем на 80%
-    
-    const adjX = scaleX * mobileScaleFactor;
-    const adjY = scaleY * mobileScaleFactor;
+  function drawSkeleton(keypoints, minConfidence, ctx, scaleX, scaleY) {
+    // Множество для отслеживания уникальных точек
+    const seenKeypoints = new Set();
   
-    // Уменьшаем толщину линий для мобильных устройств
-    const lineWidth = isMobile ? 2 : 4; // Меньше для мобильных устройств
-    
-    // Получаем все смежные точки для рисования линий
-    const adjacentKeyPoints = posenet.getAdjacentKeyPoints(keypoints, minConfidence);
-    
-    adjacentKeyPoints.forEach(([from, to]) => {
-      ctx.beginPath();
-  
-      // Корректируем координаты с учетом масштаба и мобильной адаптации
-      const fromX = from.position.x * adjX + 5;  // Небольшой отступ для точности
-      const fromY = from.position.y * adjY + 5;  // Небольшой отступ для точности
-      const toX = to.position.x * adjX + 5;      // Небольшой отступ для точности
-      const toY = to.position.y * adjY + 5;      // Небольшой отступ для точности
-      
-      ctx.moveTo(fromX, fromY);
-      ctx.lineTo(toX, toY);
-      ctx.lineWidth = lineWidth;  // Устанавливаем толщину линии
-      ctx.strokeStyle = "rgb(0, 255, 0)";
-      ctx.stroke();
-    });
-  
-    // Отображаем ключевые точки (если необходимо)
+    // Рисуем каждую точку, если её уверенность больше порогового значения
     keypoints.forEach((keypoint) => {
-      if (keypoint.score > minConfidence) {
-        const x = keypoint.position.x * adjX;
-        const y = keypoint.position.y * adjY;
-        
+      if (keypoint.score > minConfidence && !seenKeypoints.has(keypoint.part)) {
+        seenKeypoints.add(keypoint.part);
+  
+        // Преобразуем координаты с учётом масштаба
+        const x = keypoint.position.x * scaleX;
+        const y = keypoint.position.y * scaleY;
+  
+        // Рисуем точку
         ctx.beginPath();
-        ctx.arc(x, y, 3, 0, 2 * Math.PI); // Уменьшаем размер точек на мобильных устройствах
-        ctx.fillStyle = "red";
+        ctx.arc(x, y, 5, 0, 2 * Math.PI); // Размер точки 5px
+        ctx.fillStyle = 'red'; // Цвет точки
         ctx.fill();
       }
     });
-  };
+  
+    // Рисуем соединения между соседними точками (если они существуют)
+    posenet.getAdjacentKeyPoints(keypoints, minConfidence).forEach((keypointPair) => {
+      const [keypoint1, keypoint2] = keypointPair;
+  
+      if (!seenKeypoints.has(keypoint1.part) && !seenKeypoints.has(keypoint2.part)) {
+        const x1 = keypoint1.position.x * scaleX;
+        const y1 = keypoint1.position.y * scaleY;
+        const x2 = keypoint2.position.x * scaleX;
+        const y2 = keypoint2.position.y * scaleY;
+  
+        // Рисуем линию между точками
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = 'red'; // Цвет линии
+        ctx.lineWidth = 2; // Толщина линии
+        ctx.stroke();
+      }
+    });
+  }
+  
     
   return (
     <div className="App">
